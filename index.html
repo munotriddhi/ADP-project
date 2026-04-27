@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Student Study Planner Dashboard — track tasks, exams, study sessions and more.">
+    <title>Student Study Planner</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container" id="app-container" style="display:none">
+        <!-- ===== SIDEBAR ===== -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <i class="ph-fill ph-student"></i>
+                <h2>Study Planner</h2>
+            </div>
+            <ul class="nav-links">
+                <li class="active" data-tab="dashboard-tab"><i class="ph ph-squares-four"></i> Dashboard</li>
+                <li data-tab="timetable-tab"><i class="ph ph-calendar-blank"></i> Timetable</li>
+                <li data-tab="tasks-tab"><i class="ph ph-check-square"></i> Tasks</li>
+                <li data-tab="pomodoro-tab"><i class="ph ph-timer"></i> Pomodoro</li>
+                <li data-tab="exams-tab"><i class="ph ph-exam"></i> Exams</li>
+                <li data-tab="notes-tab"><i class="ph ph-notebook"></i> Notes</li>
+                <li data-tab="analytics-tab"><i class="ph ph-chart-bar"></i> Analytics</li>
+                <li data-tab="settings-tab"><i class="ph ph-gear"></i> Settings</li>
+            </ul>
+            <div style="margin-top:auto; padding: 0 0.75rem">
+                <li id="btn-logout" style="list-style:none; color:var(--danger); display:flex; align-items:center; gap:0.85rem; padding:0.7rem 1rem; cursor:pointer; font-weight:500; font-size:0.93rem; border-radius:var(--radius-md)">
+                    <i class="ph ph-sign-out"></i> Logout
+                </li>
+            </div>
+        </nav>
+
+        <!-- ===== MAIN ===== -->
+        <main class="main-content">
+            <header class="topbar">
+                <div class="greeting">
+                    <h1 id="greeting-text">Good Evening!</h1>
+                    <p id="user-welcome">Let's make today productive.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button id="theme-toggle" class="icon-btn" title="Toggle Theme"><i class="ph ph-moon"></i></button>
+                    <div class="streak-badge">
+                        <i class="ph-fill ph-fire"></i> <span id="streak-count">0</span> Day Streak
+                    </div>
+                    <div class="profile-pill">
+                        <img src="assets/avatar.png" alt="Profile" class="profile-avatar">
+                        <span class="profile-name" id="profile-display-name">Guest</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ========== DASHBOARD TAB ========== -->
+            <div id="dashboard-tab" class="tab-content active">
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(52,211,153,0.1);color:var(--success)"><i class="ph ph-check-circle"></i></div>
+                        <div class="stat-info"><h4>Tasks Done</h4><span id="stat-tasks">0/0</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:var(--accent-glow);color:var(--accent)"><i class="ph ph-clock"></i></div>
+                        <div class="stat-info"><h4>Study Hours</h4><span id="stat-hours">0h</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(251,191,36,0.1);color:var(--warning)"><i class="ph ph-calendar-blank"></i></div>
+                        <div class="stat-info"><h4>Next Exam</h4><span id="stat-exam">--</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(251,113,133,0.1);color:var(--danger)"><i class="ph-fill ph-fire"></i></div>
+                        <div class="stat-info"><h4>Streak</h4><span id="stat-streak">0</span></div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dash-main-col">
+                        <div class="card chart-card">
+                            <div class="card-header">
+                                <h3>Weekly Study Hours</h3>
+                            </div>
+                            <div class="chart-container"><canvas id="weeklyChart"></canvas></div>
+                        </div>
+                        <div class="dashboard-split-row">
+                            <div class="card timetable-card">
+                                <div class="card-header">
+                                    <h3>Today's Classes</h3>
+                                    <button id="btn-add-class" class="icon-btn small" title="Add class"><i class="ph ph-plus"></i></button>
+                                </div>
+                                <div class="timeline" id="dash-timeline"></div>
+                            </div>
+                            <div class="card exams-card">
+                                <div class="card-header">
+                                    <h3>Upcoming Exams</h3>
+                                    <button id="btn-add-exam" class="icon-btn small" title="Add exam"><i class="ph ph-plus"></i></button>
+                                </div>
+                                <div class="exam-list" id="dash-exams"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dash-side-col">
+                        <div class="card tasks-card">
+                            <div class="card-header">
+                                <h3>Today's Tasks</h3>
+                                <button id="btn-add-task" class="icon-btn small" title="Add task"><i class="ph ph-plus"></i></button>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="task-progress-fill" style="width:0%"></div>
+                            </div>
+                            <div class="task-list" id="dash-tasks"></div>
+                        </div>
+
+                        <div class="card mini-pomodoro">
+                            <div class="card-header">
+                                <h3>Focus Session</h3>
+                                <i class="ph ph-timer" style="color:var(--accent);font-size:1.15rem"></i>
+                            </div>
+                            <div class="pomodoro-display"><span id="dash-timer">25:00</span></div>
+                            <div class="pomodoro-controls">
+                                <button id="dash-start-timer" class="btn primary">Start</button>
+                                <button id="dash-reset-timer" class="btn secondary">Reset</button>
+                            </div>
+                        </div>
+
+                        <div class="card quote-card">
+                            <i class="ph-fill ph-quotes"></i>
+                            <p id="daily-quote">"Loading inspiration..."</p>
+                            <span id="daily-quote-author"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== TIMETABLE TAB ========== -->
+            <div id="timetable-tab" class="tab-content">
+                <div class="tab-header-row">
+                    <h2>Weekly Timetable</h2>
+                    <div style="display:flex; gap:0.5rem">
+                        <input type="file" id="timetable-upload" accept="image/*" style="display:none">
+                        <button id="btn-upload-timetable" class="btn secondary" style="flex:none;padding:0.5rem 1rem"><i class="ph ph-image" style="margin-right:0.3rem"></i> Upload Image</button>
+                        <button id="btn-add-class-full" class="btn primary" style="flex:none;padding:0.5rem 1rem"><i class="ph ph-plus" style="margin-right:0.3rem"></i> Add Class</button>
+                    </div>
+                </div>
+                <div id="ocr-status" style="display:none; margin-bottom:1rem; padding:1rem; background:var(--bg-elevated); border-radius:var(--radius-md); border:1px solid var(--accent); color:var(--accent); font-size:0.9rem; align-items:center; gap:0.5rem">
+                    <i class="ph ph-spinner-gap ph-spin"></i> Reading timetable image... <span id="ocr-progress">0%</span>
+                </div>
+                <div class="card">
+                    <div class="full-class-list" id="full-class-list"></div>
+                </div>
+            </div>
+
+            <!-- ========== TASKS TAB ========== -->
+            <div id="tasks-tab" class="tab-content">
+                <div class="tab-header-row">
+                    <h2>Task & Assignment Tracker</h2>
+                    <button id="btn-add-task-full" class="btn primary" style="flex:none;padding:0.5rem 1rem"><i class="ph ph-plus" style="margin-right:0.3rem"></i> Add Task</button>
+                </div>
+                <div class="card">
+                    <div class="full-task-list" id="full-task-list"></div>
+                </div>
+            </div>
+
+            <!-- ========== POMODORO TAB ========== -->
+            <div id="pomodoro-tab" class="tab-content">
+                <h2>Pomodoro Focus Timer</h2>
+                <div class="pomodoro-page-grid">
+                    <div class="card pomodoro-main-card">
+                        <div class="pomo-mode-tabs">
+                            <button class="pomo-mode active" data-mins="25">Focus</button>
+                            <button class="pomo-mode" data-mins="5">Short Break</button>
+                            <button class="pomo-mode" data-mins="15">Long Break</button>
+                        </div>
+                        <div class="pomo-timer-ring">
+                            <span id="pomo-full-timer">25:00</span>
+                        </div>
+                        <div class="pomodoro-controls" style="max-width:280px;margin:0 auto">
+                            <button id="pomo-full-start" class="btn primary">Start</button>
+                            <button id="pomo-full-reset" class="btn secondary">Reset</button>
+                        </div>
+                        <div class="pomo-session-count" style="margin-top:1.25rem;text-align:center">
+                            <span style="color:var(--text-secondary);font-size:0.85rem">Sessions completed today: </span>
+                            <span id="pomo-sessions" style="font-weight:700;color:var(--accent)">0</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom:1rem">Session Log</h3>
+                        <div id="pomo-log" class="pomo-log-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== EXAMS TAB ========== -->
+            <div id="exams-tab" class="tab-content">
+                <div class="tab-header-row">
+                    <h2>Exam Countdown</h2>
+                    <button id="btn-add-exam-full" class="btn primary" style="flex:none;padding:0.5rem 1rem"><i class="ph ph-plus" style="margin-right:0.3rem"></i> Add Exam</button>
+                </div>
+                <div class="exam-cards-grid" id="full-exam-list"></div>
+            </div>
+
+            <!-- ========== NOTES TAB ========== -->
+            <div id="notes-tab" class="tab-content">
+                <div class="tab-header-row">
+                    <h2>Quick Notes</h2>
+                    <div style="display:flex;gap:0.5rem;align-items:center">
+                        <input type="text" id="note-search" placeholder="Search notes..." class="search-input">
+                        <button id="btn-add-note" class="btn primary" style="flex:none;padding:0.5rem 1rem"><i class="ph ph-plus" style="margin-right:0.3rem"></i> Add Note</button>
+                    </div>
+                </div>
+                <div class="notes-grid" id="notes-grid"></div>
+            </div>
+
+            <!-- ========== ANALYTICS TAB ========== -->
+            <div id="analytics-tab" class="tab-content">
+                <h2>Progress & Analytics</h2>
+                <div class="analytics-grid">
+                    <div class="card" style="grid-column:span 2">
+                        <div class="card-header"><h3>Study Hours This Week</h3></div>
+                        <div class="chart-container"><canvas id="analyticsChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>GPA Tracker</h3></div>
+                        <div id="gpa-section">
+                            <div class="form-group"><label>Grade (e.g. 3.5)</label><input type="number" id="gpa-grade" step="0.1" min="0" max="4" placeholder="3.5"></div>
+                            <div class="form-group"><label>Credits</label><input type="number" id="gpa-credits" min="1" max="10" placeholder="3"></div>
+                            <button id="gpa-add" class="btn primary" style="margin-top:0.5rem">Add Course</button>
+                            <div id="gpa-list" style="margin-top:1rem"></div>
+                            <div id="gpa-result" style="margin-top:0.75rem;font-size:1.2rem;font-weight:700"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Study Streak</h3></div>
+                        <div style="text-align:center;padding:1rem 0">
+                            <i class="ph-fill ph-fire" style="font-size:3rem;color:var(--warning)"></i>
+                            <div style="font-size:2.5rem;font-weight:700;margin:0.5rem 0" id="analytics-streak">0</div>
+                            <p style="color:var(--text-secondary)">consecutive days</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== SETTINGS TAB ========== -->
+            <div id="settings-tab" class="tab-content">
+                <h2>UI & Customization</h2>
+                <div class="settings-grid">
+                    <div class="card">
+                        <h3>Accent Color</h3>
+                        <p style="color:var(--text-secondary);margin-top:0.4rem;font-size:0.88rem">Choose your preferred primary color.</p>
+                        <div class="color-options">
+                            <button class="color-btn" data-color="#818cf8" style="background:#818cf8"></button>
+                            <button class="color-btn" data-color="#34d399" style="background:#34d399"></button>
+                            <button class="color-btn" data-color="#fbbf24" style="background:#fbbf24"></button>
+                            <button class="color-btn" data-color="#fb7185" style="background:#fb7185"></button>
+                            <button class="color-btn" data-color="#a78bfa" style="background:#a78bfa"></button>
+                            <button class="color-btn" data-color="#38bdf8" style="background:#38bdf8"></button>
+                            <button class="color-btn" data-color="#f472b6" style="background:#f472b6"></button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>Data Management</h3>
+                        <p style="color:var(--text-secondary);margin-top:0.4rem;font-size:0.88rem">Export or clear your data.</p>
+                        <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
+                            <button id="btn-export" class="btn secondary"><i class="ph ph-download-simple"></i> Export JSON</button>
+                            <button id="btn-clear" class="btn secondary" style="color:var(--danger);border-color:var(--danger)"><i class="ph ph-trash"></i> Clear All Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ===== AUTH OVERLAY ===== -->
+    <div id="auth-overlay" class="modal-overlay active" style="background:var(--bg-base); z-index: 2000">
+        <div class="modal-content" style="max-width: 400px; padding: 2.5rem; text-align:center">
+            <div style="margin-bottom: 2rem">
+                <i class="ph-fill ph-student" style="font-size: 4rem; color: var(--accent)"></i>
+                <h1 style="font-size: 1.75rem; margin-top: 1rem">Study Planner</h1>
+                <p style="color:var(--text-secondary)">Your academic journey starts here.</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form">
+                <div class="form-group" style="text-align:left">
+                    <label for="login-user">Username</label>
+                    <input type="text" id="login-user" name="username" autocomplete="username" required placeholder="Enter username">
+                </div>
+                <div class="form-group" style="text-align:left">
+                    <label for="login-pass">Password</label>
+                    <input type="password" id="login-pass" name="password" autocomplete="current-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn primary" style="width:100%; padding: 0.8rem; margin-top: 1rem">Login</button>
+                <p style="margin-top: 1.5rem; font-size: 0.9rem; color:var(--text-secondary)">
+                    New here? <a href="#" id="show-signup" style="color:var(--accent); text-decoration:none; font-weight:600">Create account</a>
+                </p>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signup-form" style="display:none">
+                <div class="form-group" style="text-align:left">
+                    <label for="signup-user">Username</label>
+                    <input type="text" id="signup-user" name="username" autocomplete="username" required placeholder="Pick a username">
+                </div>
+                <div class="form-group" style="text-align:left">
+                    <label for="signup-pass">Password</label>
+                    <input type="password" id="signup-pass" name="password" autocomplete="new-password" required placeholder="••••••••">
+                </div>
+                <div class="form-group" style="text-align:left">
+                    <label for="signup-pass-confirm">Confirm Password</label>
+                    <input type="password" id="signup-pass-confirm" name="confirm-password" autocomplete="new-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn primary" style="width:100%; padding: 0.8rem; margin-top: 1rem">Sign Up</button>
+                <p style="margin-top: 1.5rem; font-size: 0.9rem; color:var(--text-secondary)">
+                    Already have an account? <a href="#" id="show-login" style="color:var(--accent); text-decoration:none; font-weight:600">Sign In</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== PROFILE MODAL ===== -->
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width:400px">
+            <div class="modal-header">
+                <h3>Student Profile</h3>
+                <button id="close-profile-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <div style="text-align:center; margin-bottom:1.5rem">
+                <img src="assets/avatar.png" alt="Profile" style="width:80px; height:80px; border-radius:50%; border:3px solid var(--accent); margin-bottom:0.5rem">
+                <h2 id="prof-modal-username" style="font-size:1.25rem; color:var(--text-primary)">Username</h2>
+            </div>
+            <form id="profile-details-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="prof-fullname" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="prof-email" placeholder="e.g. john@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Class / Major</label>
+                    <input type="text" id="prof-class" placeholder="e.g. Computer Science - Year 2">
+                </div>
+                <div class="form-actions" style="margin-top:1.5rem">
+                    <button type="submit" class="btn primary" style="width:100%">Save Profile Updates</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== TASK MODAL ===== -->
+    <div id="task-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="task-modal-title">Add New Task</h3>
+                <button id="close-task-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="form-group">
+                    <label for="task-title">Task Title</label>
+                    <input type="text" id="task-title" required placeholder="e.g. Math Homework">
+                </div>
+                <div class="form-group">
+                    <label for="task-priority">Priority</label>
+                    <select id="task-priority">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== EXAM MODAL ===== -->
+    <div id="exam-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="exam-modal-title">Add New Exam</h3>
+                <button id="close-exam-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="exam-form">
+                <input type="hidden" id="exam-id">
+                <div class="form-group">
+                    <label for="exam-title">Exam Name</label>
+                    <input type="text" id="exam-title" required placeholder="e.g. Physics Midterm">
+                </div>
+                <div class="form-group">
+                    <label for="exam-date">Date</label>
+                    <input type="date" id="exam-date" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Save Exam</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== CLASS MODAL ===== -->
+    <div id="class-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="class-modal-title">Add Class</h3>
+                <button id="close-class-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="class-form">
+                <input type="hidden" id="class-id">
+                <div class="form-group">
+                    <label for="class-title">Class Name</label>
+                    <input type="text" id="class-title" required placeholder="e.g. Calculus 101">
+                </div>
+                <div class="form-group">
+                    <label for="class-day">Day of Week</label>
+                    <select id="class-day">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="class-start">Start Time</label>
+                    <input type="time" id="class-start" required>
+                </div>
+                <div class="form-group">
+                    <label for="class-end">End Time</label>
+                    <input type="time" id="class-end" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Save Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== NOTE MODAL ===== -->
+    <div id="note-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="note-modal-title">Add Note</h3>
+                <button id="close-note-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="note-form">
+                <input type="hidden" id="note-id">
+                <div class="form-group">
+                    <label for="note-title-input">Title</label>
+                    <input type="text" id="note-title-input" required placeholder="e.g. Key Formulas">
+                </div>
+                <div class="form-group">
+                    <label for="note-content">Content</label>
+                    <textarea id="note-content" rows="4" placeholder="Write your note..." style="width:100%;padding:0.7rem 0.85rem;background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:inherit;font-size:0.93rem;outline:none;resize:vertical"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="note-tag">Subject Tag</label>
+                    <input type="text" id="note-tag" placeholder="e.g. Physics">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Save Note</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== OCR REVIEW MODAL ===== -->
+    <div id="ocr-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width:500px">
+            <div class="modal-header">
+                <h3>Review Detected Classes</h3>
+                <button id="close-ocr-modal" class="icon-btn small"><i class="ph ph-x"></i></button>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem">
+                We found these classes in your image. Please verify the details before saving.
+            </p>
+            <div id="ocr-results-list" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1.5rem">
+                <!-- Dynamic rows here -->
+            </div>
+            <div class="form-actions">
+                <button id="btn-ocr-save-all" class="btn primary">Add to Timetable</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SCRIPTS ===== -->
+    <script src="js/storage.js"></script>
+    <script src="js/modules/theme.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/modules/timer.js"></script>
+    <script src="js/modules/dashboard.js"></script>
+    <script src="js/modules/tasks.js"></script>
+    <script src="js/modules/exams.js"></script>
+    <script src="js/modules/timetable.js"></script>
+    <script src="js/modules/notes.js"></script>
+    <script src="js/modules/pomodoro.js"></script>
+    <script src="js/modules/analytics.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
